@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>4x4 Chess Game</title>
+<style>
+  /* Transparent background, full viewport */
+  html, body {
+    margin: 0; padding: 0; height: 100vh; background: transparent; overflow: hidden;
+    display: flex; justify-content: center; align-items: center;
+  }
+
+  /* Container to keep 1:1 aspect ratio */
+  #board {
+    width: 320px;  /* adjust size as needed */
+    height: 320px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 0;
+    background: transparent;
+    user-select: none;
+    position: relative;
+  }
+
+  .cell {
+    border: none;
+    background: transparent;
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+
+  .token {
+    position: absolute;
+    width: 80%;
+    height: 80%;
+    top: 10%;
+    left: 10%;
+    cursor: pointer;
+  }
+
+  .token.fixed {
+    cursor: default;
+  }
+</style>
+</head>
+<body>
+
+<div id="board"></div>
+
+<script>
+  // Placeholder images for tokens; replace 'xxx.png' filenames with actual images
+  const TOKEN_IMAGES = {
+    rook: 'rook.png',
+    bishop: 'bishop.png',
+    knight: 'knight.png',
+    king: 'king.png',
+    star: 'star.png',
+    block: 'block.jpg'
+  };
+
+  // Board data from JSON example format (should be fetched from GitHub raw link)
+  // Example JSON: { "A1": "rook", "B2": "star", "C3": "king", "D4": "block" }
+  // Coordinates: A, B, C, D for rows; 1,2,3,4 for columns
+  const GITHUB_RAW_JSON_URL = 'https://raw.githubusercontent.com/GOLu496/Files/main/puzzle.json';
+
+  const board = document.getElementById('board');
+
+  // Variables
+  const rows = ['A', 'B', 'C', 'D'];
+  const cols = ['1', '2', '3', '4'];
+  let boardState = {};      // Current tokens placement {pos: token}
+  let fixedTokens = new Set();  // Positions of fixed tokens (star, block)
+  let selectedToken = null;  // selected token element for moving
+  let selectedPos = null;    // position of selected token
+
+  // Initialize board cells
+  function createBoard() {
+    board.innerHTML = '';
+    for (let r of rows) {
+      for (let c of cols) {
+        const cell = document.createElement('div');
+        cell.classList.add('cell');
+        cell.dataset.pos = r + c;
+        board.appendChild(cell);
+      }
+    }
+  }
+
+  // Utility to get cell element by position string
+  function getCell(pos) {
+    return board.querySelector(`.cell[data-pos="${pos}"]`);
+  }
+
+  // Load JSON data and update board state
+  async function loadBoardData() {
+    try {
+      const res = await fetch(GITHUB_RAW_JSON_URL);
+      if (!res.ok) throw new Error('Failed to fetch board data!');
+      const data = await res.json();
+      setBoardState(data);
+    } catch (e) {
+      console.error('Error loading board data:', e);
+    }
+  }
+
+  // Set board state and render tokens
+  function setBoardState(data) {
+    boardState = {};
+    fixedTokens.clear();
+    // Clear board tokens first
+    document.querySelectorAll('.token').forEach(t => t.remove());
+
+    // Update boardState from data
+    for (let pos in data) {
+      const token = data[pos];
+      boardState[pos] = token;
+      if (token === 'star' || token === 'block') {
+        fixedTokens.add(pos);
+      }
+    }
+    renderTokens();
+  }
+
+  // Render tokens based on boardState
+  function renderTokens() {
+    for (let pos in boardState) {
+      const token = boardState[pos];
+      const cell = getCell(pos);
+      if (!cell) continue;
+      const img = document.createElement('img');
+      img.src = TOKEN_IMAGES[token] || 'unknown.png';
+      img.classList.add('token');
+      if (fixedTokens.has(pos)) img.classList.add('fixed');
+      img.dataset.pos = pos;
+      img.dataset.token = token;
+      cell.appendChild(img);
+
+      if (!fixedTokens.has(pos)) {
+        img.addEventListener('click', () => selectToken(img));
+      }
+    }
+  }
+
+  // Select token to move
+  function selectToken(tokenElem) {
+    if (selectedToken) {
+      selectedToken.style.border = '';
+    }
+    selectedToken = tokenElem;
+    selectedPos = tokenElem.dataset.pos;
+    tokenElem.style.border = '2px solid #FFF'; // highlight
+    showPossibleMoves(selectedPos, tokenElem.dataset.token);
+  }
+
+  // Calculate possible moves according to chess rules (for black pieces)
+  function showPossibleMoves(pos, token) {
+    clearHighlights();
+    const moves = calculateMoves(pos, token);
+    moves.forEach(p => {
+      const cell = getCell(p);
+      if (cell && !fixedTokens.has(p)) {
+        cell.style.outline = '2px solid yellow';
+        cell.addEventListener('click', () => moveToken(selectedPos, p));
+      }
+    });
+  }
+
+  // Clear all move highlights and click listeners
+  function clearHighlights() {
+    document.querySelectorAll('.cell').forEach(cell => {
+      cell.style.outline = '';
+      const newEl = cell.cloneNode(true);
+      cell.parentNode.replaceChild(newEl, cell);
+    });
+  }
+
+  // Move token from oldPos to newPos
+  function moveToken(oldPos, newPos) {
+    if (!selectedToken) return;
+    // Update board state
+    boardState[newPos] = boardState[oldPos];
+    delete boardState[oldPos];
+
+    selectedToken.style.border = '';
+    selectedToken = null;
+    selectedPos = null;
+    clearHighlights();
+    renderTokens();
+
+    // Check win condition
+    if (boardState[newPos] === 'king' && fixedTokens.has(newPos) && boardState[newPos] === 'king') {
+      if (isStarPosition(newPos)) {
+        alert('Game Won! King reached the star.');
+      }
+    }
+  }
+
+  // Check if given pos has star token
+  function isStarPosition(pos) {
+    return boardState[pos] === 'star';
+  }
+
+  // Get numeric grid coordinate from A-D,1-4 to row,col (0 based)
+  function toCoords(pos) {
+    const row = rows.indexOf(pos[0]);
+    const col = cols.indexOf(pos[1]);
+    return [row, col];
+  }
+
+  // Get position string from row, col
+  function fromCoords(row, col) {
+    if (row < 0 || row > 3 || col < 0 || col > 3) return null;
+    return rows[row] + cols[col];
+  }
+
+  // Calculate valid moves for token type from pos (applying rules)
+  function calculateMoves(pos, token) {
+    let moves = [];
+    const [r, c] = toCoords(pos);
+
+    function addMoveIfValid(row, col) {
+      const p = fromCoords(row, col);
+      if (!p) return false;
+      if (fixedTokens.has(p)) return false;
+      if (boardState[p] && p !== pos) return false; // can't capture same color token
+      moves.push(p);
+      return true;
+    }
+
+    if (token === 'king') {
+      // King moves one step in any direction
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          addMoveIfValid(r + dr, c + dc);
+        }
+      }
+    } else if (token === 'rook') {
+      // Moves horizontally or vertically
+      // up
+      for (let nr = r - 1; nr >= 0; nr--) {
+        if (!addMoveIfValid(nr, c)) break;
+      }
+      // down
+      for (let nr = r + 1; nr < 4; nr++) {
+        if (!addMoveIfValid(nr, c)) break;
+      }
+      // left
+      for (let nc = c - 1; nc >= 0; nc--) {
+        if (!addMoveIfValid(r, nc)) break;
+      }
+      // right
+      for (let nc = c + 1; nc < 4; nc++) {
+        if (!addMoveIfValid(r, nc)) break;
+      }
+    } else if (token === 'bishop') {
+      // diagonal moves
+      // up-left
+      for (let nr = r - 1, nc = c - 1; nr >= 0 && nc >= 0; nr--, nc--) {
+        if (!addMoveIfValid(nr, nc)) break;
+      }
+      // up-right
+      for (let nr = r - 1, nc = c + 1; nr >= 0 && nc < 4; nr--, nc++) {
+        if (!addMoveIfValid(nr, nc)) break;
+      }
+      // down-left
+      for (let nr = r + 1, nc = c - 1; nr < 4 && nc >= 0; nr++, nc--) {
+        if (!addMoveIfValid(nr, nc)) break;
+      }
+      // down-right
+      for (let nr = r + 1, nc = c + 1; nr < 4 && nc < 4; nr++, nc++) {
+        if (!addMoveIfValid(nr, nc)) break;
+      }
+    } else if (token === 'knight') {
+      // Knight moves in L shape
+      const knightMoves = [[-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1]];
+      for (const [dr, dc] of knightMoves) {
+        addMoveIfValid(r + dr, c + dc);
+      }
+    }
+
+    return moves;
+  }
+
+  // Initial setup
+  createBoard();
+  loadBoardData();
+
+  // Periodically refresh JSON (optional)
+  // setInterval(loadBoardData, 10000);
+
+</script>
+
+</body>
+</html>
