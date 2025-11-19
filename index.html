@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>4x4 Chess Game</title>
 <style>
   html, body {
@@ -26,6 +26,13 @@
     width: 100%;
     height: 100%;
     position: relative;
+    transition: background-color 0.3s ease;
+  }
+  .cell.selected {
+    background-color: yellow;
+  }
+  .cell.possible-move {
+    background-color: blue;
   }
   .token {
     position: absolute;
@@ -34,6 +41,7 @@
     top: 10%;
     left: 10%;
     cursor: pointer;
+    z-index: 2;
   }
   .token.fixed {
     cursor: default;
@@ -55,32 +63,32 @@
 
   const rows = ['A', 'B', 'C', 'D'];
   const cols = ['1', '2', '3', '4'];
-  let boardState = {};  
+  let boardState = {};
   let fixedTokens = new Set();
   let selectedToken = null;
   let selectedPos = null;
 
-  // Create board cells
   function createBoard() {
-    document.getElementById('board').innerHTML = '';
+    const board = document.getElementById('board');
+    board.innerHTML = '';
     for (let r of rows) {
       for (let c of cols) {
         const cell = document.createElement('div');
         cell.className = 'cell';
         cell.dataset.pos = r + c;
-        document.getElementById('board').appendChild(cell);
+        board.appendChild(cell);
       }
     }
   }
 
-  // Fetch JSON data from backend
   async function loadBoardData() {
     try {
       const res = await fetch(GITHUB_RAW_JSON_URL);
+      if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       setBoardState(data);
     } catch(e) {
-      console.error('Fetching error:', e);
+      console.error('Load error:', e);
     }
   }
 
@@ -89,133 +97,163 @@
     fixedTokens.clear();
     document.querySelectorAll('.token').forEach(t => t.remove());
     for (let pos in data) {
-      const token = data[pos];
+      let token = data[pos];
       boardState[pos] = token;
-      if (token === 'star' || token === 'block') {
-        fixedTokens.add(pos);
-      }
+      if(token === 'star' || token === 'block') fixedTokens.add(pos);
     }
     renderTokens();
   }
 
   function renderTokens() {
-    for (let pos in boardState) {
-      const token = boardState[pos];
+    // Clear all tokens and remove cell highlights
+    document.querySelectorAll('.token').forEach(t => t.remove());
+    document.querySelectorAll('.cell').forEach(cell => {
+      cell.classList.remove('selected', 'possible-move');
+      cell.onclick = null;
+    });
+
+    for(let pos in boardState) {
+      let token = boardState[pos];
       const cell = document.querySelector(`.cell[data-pos="${pos}"]`);
-      const img = document.createElement('img');
+      let img = document.createElement('img');
       img.src = TOKEN_IMAGES[token] || 'unknown.png';
       img.className = 'token';
-      if (fixedTokens.has(pos)) img.classList.add('fixed');
+      if(fixedTokens.has(pos)) img.classList.add('fixed');
       img.dataset.pos = pos;
       img.dataset.token = token;
       cell.appendChild(img);
 
-      if (!fixedTokens.has(pos)) {
+      if(!fixedTokens.has(pos)) {
         img.addEventListener('click', () => selectToken(img));
       }
     }
   }
 
   function selectToken(tokenElem) {
-    if (selectedToken) selectedToken.style.border = '';
+    clearHighlights();
+    // Deselect previous if any
+    if(selectedToken) {
+      const prevCell = document.querySelector(`.cell[data-pos="${selectedPos}"]`);
+      if(prevCell) prevCell.classList.remove('selected');
+      selectedToken.style.border = '';
+    }
     selectedToken = tokenElem;
     selectedPos = tokenElem.dataset.pos;
-    tokenElem.style.border = '2px solid #FFF';
-    showPossibleMoves(selectedPos, tokenElem.dataset.token);
-  }
 
-  function showPossibleMoves(pos, token) {
-    clearHighlights();
-    const moves = calculateMoves(pos, token);
+    // Highlight selected token's cell yellow
+    const cell = document.querySelector(`.cell[data-pos="${selectedPos}"]`);
+    if(cell) cell.classList.add('selected');
+
+    // Optional border highlight on token
+    selectedToken.style.border = '2px solid white';
+
+    // Show possible moves with blue background
+    const moves = calculateMoves(selectedPos, selectedToken.dataset.token);
     moves.forEach(p => {
-      const cell = document.querySelector(`.cell[data-pos="${p}"]`);
-      if (cell && !fixedTokens.has(p)) {
-        cell.style.outline = '2px solid yellow';
-        cell.onclick = () => moveToken(pos, p);
+      let moveCell = document.querySelector(`.cell[data-pos="${p}"]`);
+      if(moveCell) {
+        moveCell.classList.add('possible-move');
+        moveCell.onclick = () => moveToken(selectedPos, p);
       }
     });
   }
 
   function clearHighlights() {
-    document.querySelectorAll('.cell').forEach(c => {
-      c.style.outline = '';
-      c.onclick = null;
+    document.querySelectorAll('.cell').forEach(cell => {
+      cell.classList.remove('selected', 'possible-move');
+      cell.onclick = null;
     });
+    if(selectedToken) {
+      selectedToken.style.border = '';
+      selectedToken = null;
+      selectedPos = null;
+    }
   }
 
   function moveToken(fromPos, toPos) {
-    if (!selectedToken) return;
-    // If move to star cell, and token is king, game won
-    if (boardState[fromPos] === 'king' && boardState[toPos] === 'star') {
+    if(!selectedToken) return;
+    // Block cells cannot be entered
+    if(boardState[toPos] === 'block') return;
+
+    // If king moves to star, player wins
+    if(boardState[fromPos] === 'king' && boardState[toPos] === 'star') {
       alert('Congratulations! You Win!');
     }
-    // Prevent move to block or star by other tokens (except king moving to star to win)
-    if (boardState[toPos] === 'block') return;
-    // Move token
+
+    // Move token logically
     boardState[toPos] = boardState[fromPos];
     delete boardState[fromPos];
-    selectedToken.style.border = '';
-    selectedToken = null;
-    selectedPos = null;
+
     clearHighlights();
     renderTokens();
   }
 
   function calculateMoves(pos, token) {
-    // Allowed moves based on token type - simplified
     const [r, c] = [rows.indexOf(pos[0]), cols.indexOf(pos[1])];
     const moves = [];
-    function addMove(row, col) {
-      if (row >= 0 && row < 4 && col >= 0 && col < 4) {
-        const p = rows[row] + cols[col];
-        return p;
-      }
-      return null;
+
+    function canMoveTo(row, col) {
+      if(row<0 || row>=4 || col<0 || col>=4) return false;
+      const p = rows[row] + cols[col];
+      if(boardState[p] === 'block') return false;
+      return true;
     }
 
-    if (token === 'king') {
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          if (dr === 0 && dc === 0) continue;
-          const p = addMove(r + dr, c + dc);
-          if (p && !fixedTokens.has(p)) moves.push(p);
+    if(token === 'king') {
+      for(let dr=-1; dr<=1; dr++) {
+        for(let dc=-1; dc<=1; dc++) {
+          if(dr===0 && dc===0) continue;
+          if(canMoveTo(r+dr,c+dc)) moves.push(rows[r+dr]+cols[c+dc]);
         }
       }
-    } else if (token === 'rook') {
-      // Horizontal & vertical
-      for (let i = 0; i < 4; i++) {
-        if (i !== r && !fixedTokens.has(rows[i] + cols[c])) moves.push(rows[i] + cols[c]);
-        if (i !== c && !fixedTokens.has(rows[r] + cols[i])) moves.push(rows[r] + cols[i]);
+    }
+    else if(token === 'rook') {
+      // Horizontal and vertical
+      for(let i=r+1; i<4; i++) {
+        if(!canMoveTo(i,c)) break;
+        moves.push(rows[i]+cols[c]);
       }
-    } else if (token === 'bishop') {
-      // Diagonal
-      for (let i = 1; i < 4; i++) {
-        // up-left
-        if (addMove(r - i, c - i) && !fixedTokens.has(rows[r - i] + cols[c - i])) moves.push(rows[r - i] + cols[c - i]);
-        // up-right
-        if (addMove(r - i, c + i) && !fixedTokens.has(rows[r - i] + cols[c + i])) moves.push(rows[r - i] + cols[c + i]);
-        // down-left
-        if (addMove(r + i, c - i) && !fixedTokens.has(rows[r + i] + cols[c - i])) moves.push(rows[r + i] + cols[c - i]);
-        // down-right
-        if (addMove(r + i, c + i) && !fixedTokens.has(rows[r + i] + cols[c + i])) moves.push(rows[r + i] + cols[c + i]);
+      for(let i=r-1; i>=0; i--) {
+        if(!canMoveTo(i,c)) break;
+        moves.push(rows[i]+cols[c]);
       }
-    } else if (token === 'knight') {
-      const knightMoves = [
-        [-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1]
-      ];
-      for (const [dr, dc] of knightMoves) {
-        const p = addMove(r + dr, c + dc);
-        if (p && !fixedTokens.has(p)) moves.push(p);
+      for(let j=c+1; j<4; j++) {
+        if(!canMoveTo(r,j)) break;
+        moves.push(rows[r]+cols[j]);
+      }
+      for(let j=c-1; j>=0; j--) {
+        if(!canMoveTo(r,j)) break;
+        moves.push(rows[r]+cols[j]);
       }
     }
+    else if(token === 'bishop') {
+      // Diagonals
+      for(let i=1; i<4; i++) {
+        if(canMoveTo(r-i,c-i)) moves.push(rows[r-i]+cols[c-i]); else break;
+      }
+      for(let i=1; i<4; i++) {
+        if(canMoveTo(r-i,c+i)) moves.push(rows[r-i]+cols[c+i]); else break;
+      }
+      for(let i=1; i<4; i++) {
+        if(canMoveTo(r+i,c-i)) moves.push(rows[r+i]+cols[c-i]); else break;
+      }
+      for(let i=1; i<4; i++) {
+        if(canMoveTo(r+i,c+i)) moves.push(rows[r+i]+cols[c+i]); else break;
+      }
+    }
+    else if(token === 'knight') {
+      // Knight moves
+      const knightSteps = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+      for(const [dr,dc] of knightSteps) {
+        if(canMoveTo(r+dr,c+dc)) moves.push(rows[r+dr]+cols[c+dc]);
+      }
+    }
+
     return moves;
   }
 
   createBoard();
   loadBoardData();
-
-  // Optional: refresh JSON periodically
-  // setInterval(loadBoardData, 10000);
 </script>
 </body>
 </html>
