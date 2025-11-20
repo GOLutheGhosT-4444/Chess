@@ -34,16 +34,18 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            background-image: 'bg.jpg':
+            
         }
 
         #board {
+            background-image: url('bg.jpg');
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             grid-template-rows: repeat(4, 1fr);
             width: 100%;
             flex: 1; 
             border: none;
+            
         }
 
         .square {
@@ -239,6 +241,8 @@
                     
                     if (cellData.base === 'Star' && selectedPieceType === 'King') {
                         isGameOver = true;
+
+                        statusElement.textContent = ' Game_Won';
                         
                         boardState[row][col].current = selectedPieceType; 
                         boardState[sR][sC].current = null; 
