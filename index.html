@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>4x4 Custom Chess Game - Double Layer</title>
+    <title>4x4 Custom Chess Game - Double Layer Fixed Star</title>
     
     <style>
         /* 1. नॉन-ज़ूमेबल और नॉन-स्क्रॉलेबल के लिए CSS */
@@ -46,7 +46,6 @@
         }
 
         .square {
-            /* सेल का बैकग्राउंड पूरी तरह पारदर्शी */
             background-color: transparent !important; 
             display: flex;
             justify-content: center;
@@ -55,8 +54,8 @@
             user-select: none;
             box-sizing: border-box;
             border: 1px solid rgba(0, 0, 0, 0.1); 
-            /* बच्चों को ओवरलैप करने के लिए relative पोजीशनिंग */
             position: relative; 
+            overflow: hidden; /* सुनिश्चित करें कि इमेज सेल के बाहर न जाए */
         }
 
         /* इमेज स्टाइल */
@@ -64,12 +63,15 @@
             width: 100%;
             height: 100%;
             object-fit: contain;
-            position: absolute; /* बेस और करंट को ओवरलैप करने के लिए */
+            position: absolute; 
         }
 
         /* बेस इमेज (Star/Block/Empty) - पीछे रहेगी */
         .base-image {
             z-index: 1; 
+            /* Base इमेज को थोड़ा छोटा रखें ताकि करंट इमेज के लिए जगह बने */
+            width: 80%; 
+            height: 80%;
         }
 
         /* करंट इमेज (King/Rook/Empty) - आगे रहेगी */
@@ -78,9 +80,10 @@
             transition: transform 0.1s ease-in-out;
         }
 
-        /* खाली सेल में केवल बेस इमेज दिखेगी, करंट इमेज transparent रहेगी */
-        .current-image[alt="Empty"] {
-            opacity: 0;
+        /* जब कोई मूवेबल टोकन नहीं होता है, तब करंट इमेज को छिपाएँ (Transparent रखें) */
+        /* यह सुनिश्चित करता है कि बेस इमेज (Star) हमेशा दिखे */
+        .current-image[alt="Empty_Current"] {
+            display: none; 
         }
 
 
@@ -113,7 +116,7 @@
     </div>
 
     <script>
-        /* JavaScript (अपडेटेड डबल-लेयर लॉजिक) */
+        /* JavaScript (फिक्स्ड Star/Empty लॉजिक) */
         
         // !!! यहाँ अपनी GitHub रॉ JSON लिंक डालें !!!
         const JSON_URL = "https://raw.githubusercontent.com/GOLu496/Files/main/puzzle.json";
@@ -124,18 +127,18 @@
             'Bishop': 'bishop.png',
             'King': 'king.png',
             'Star': 'star.png', 
-            'Block': 'block.jpg',
-            'Empty': 'empty.png'
+            'Block': 'block.png',
+            'Empty_Base': 'empty.png', 
+            'Empty_Current': 'empty.png' 
         };
         
-        // बेस टोकन जो अपनी जगह पर फिक्स रहते हैं
         const FIXED_TOKENS = ['Star', 'Block'];
 
         const BOARD_SIZE = 4;
         const boardElement = document.getElementById('board');
         const statusElement = document.getElementById('status-message');
 
-        // boardState अब एक ऑब्जेक्ट स्टोर करेगा: {base: 'Star' / 'Empty', current: 'King' / null}
+        // boardState अब एक ऑब्जेक्ट स्टोर करेगा: {base: 'Star' / 'Empty_Base', current: 'King' / null}
         let boardState = []; 
         let selectedSquare = null; 
         let isGameOver = false;
@@ -150,9 +153,9 @@
                 }
                 const initialConfig = await response.json();
                 
-                // बोर्ड को इनिशियलाइज़ करें: {base: 'Empty', current: null}
+                // बोर्ड को इनिशियलाइज़ करें: {base: 'Empty_Base', current: null}
                 boardState = Array(BOARD_SIZE).fill(0).map(() => 
-                    Array(BOARD_SIZE).fill(0).map(() => ({ base: 'Empty', current: null }))
+                    Array(BOARD_SIZE).fill(0).map(() => ({ base: 'Empty_Base', current: null }))
                 );
 
                 initialConfig.pieces.forEach(p => {
@@ -179,7 +182,7 @@
             }
         }
 
-        // --- 2. बोर्ड को HTML पर रेंडर करें (डबल-लेयर इमेज के साथ) ---
+        // --- 2. बोर्ड को HTML पर रेंडर करें (फिक्स्ड Star के साथ) ---
         function renderBoard() {
             boardElement.innerHTML = '';
             for (let r = 0; r < BOARD_SIZE; r++) {
@@ -192,15 +195,15 @@
                     square.setAttribute('data-col', c);
                     square.addEventListener('click', () => handleSquareClick(r, c));
 
-                    // बेस इमेज (Star, Block, या Empty)
+                    // बेस इमेज (Star, Block, या Empty_Base) - यह हमेशा दिखेगी
                     const baseImage = document.createElement('img');
                     baseImage.classList.add('piece-image', 'base-image');
                     baseImage.src = IMAGE_FILES[cellData.base];
                     baseImage.alt = cellData.base;
                     square.appendChild(baseImage);
 
-                    // करंट इमेज (Movable Piece, या Empty)
-                    const currentPiece = cellData.current || 'Empty';
+                    // करंट इमेज (Movable Piece, या Empty_Current)
+                    const currentPiece = cellData.current || 'Empty_Current';
                     const currentImage = document.createElement('img');
                     currentImage.classList.add('piece-image', 'current-image');
                     currentImage.src = IMAGE_FILES[currentPiece];
@@ -237,7 +240,7 @@
             }
             
             const cellData = boardState[row][col];
-            const pieceType = cellData.current; // हम सिर्फ current पीस को मूव करते हैं
+            const pieceType = cellData.current;
             
             if (selectedSquare) {
                 const [sR, sC] = selectedSquare;
@@ -249,9 +252,7 @@
                     if (cellData.base === 'Star' && selectedPieceType === 'King') {
                         isGameOver = true;
                         
-                        // King को Star वाले सेल के current लेयर में मूव करें
                         boardState[row][col].current = selectedPieceType; 
-                        // King की पुरानी जगह खाली करें
                         boardState[sR][sC].current = null; 
                         
                         selectedSquare = null;
@@ -294,10 +295,10 @@
             renderBoard(); 
         }
 
-        // --- 5. नियम और मूव लॉजिक ---
+        // --- 5. नियम और मूव लॉजिक (वही रहा) ---
 
-        // हम केवल current लेयर के टोकन को मूव कर सकते हैं (बेस टोकन फिक्स हैं)
         function isMovable(pieceType) {
+            // केवल मूवेबल टोकन को ही सेलेक्ट करने की अनुमति दें
             return pieceType !== null && !FIXED_TOKENS.includes(pieceType);
         }
 
