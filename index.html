@@ -1,259 +1,367 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>4x4 Chess Game</title>
-<style>
-  html, body {
-    margin: 0; padding: 0; height: 100vh; background: transparent;
-    display: flex; justify-content: center; align-items: center;
-  }
-  #board {
-    width: 320px;
-    height: 320px;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    grid-template-rows: repeat(4, 1fr);
-    gap: 0;
-    background: transparent;
-    user-select: none;
-    position: relative;
-  }
-  .cell {
-    border: none;
-    background: transparent;
-    width: 100%;
-    height: 100%;
-    position: relative;
-    transition: background-color 0.3s ease;
-  }
-  .cell.selected {
-    background-color: yellow;
-  }
-  .cell.possible-move {
-    background-color: blue;
-  }
-  .token {
-    position: absolute;
-    width: 80%;
-    height: 80%;
-    top: 10%;
-    left: 10%;
-    cursor: pointer;
-    z-index: 2;
-  }
-  .token.fixed {
-    cursor: default;
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>4x4 Custom Chess Game - Transparent</title>
+    
+    <style>
+        /* 1. नॉन-ज़ूमेबल और नॉन-स्क्रॉलेबल के लिए CSS */
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* स्क्रॉलिंग अक्षम करें */
+            height: 100%;
+            width: 100%;
+        }
+
+        /* 2. पूरी तरह से पारदर्शी बैकग्राउंड */
+        body {
+            background-color: transparent !important; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 3. 1:1 कंटेनर */
+        #game-container {
+            width: 100vw; 
+            height: 100vw; 
+            max-width: 100vh; 
+            max-height: 100vh;
+            box-sizing: border-box;
+            padding: 1vmin; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            width: 100%;
+            flex: 1; 
+            border: none; /* बॉर्डर हटा दिया क्योंकि पूरा पेज पारदर्शी है */
+        }
+
+        .square {
+            /* सेल का बैकग्राउंड पूरी तरह पारदर्शी */
+            background-color: transparent !important; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            box-sizing: border-box;
+            border: 1px solid rgba(0, 0, 0, 0.1); /* हल्का बॉर्डर सिर्फ ग्रिड दिखाने के लिए */
+        }
+
+        /* टोकन इमेज का स्टाइल */
+        .piece-image {
+            width: 90%; /* सेल के अंदर इमेज साइज़ */
+            height: 90%;
+            object-fit: contain; /* सुनिश्चित करता है कि इमेज स्क्वीज न हो */
+            transition: transform 0.1s ease-in-out;
+        }
+
+        .selected {
+            /* सेलेक्ट होने पर हल्का पीला हाईलाइट (पारदर्शिता के साथ) */
+            background-color: rgba(255, 235, 59, 0.5) !important; 
+        }
+
+        .highlight {
+            /* कानूनी चालों के लिए हरा हाईलाइट (पारदर्शिता के साथ) */
+            background-color: rgba(165, 214, 167, 0.5) !important; 
+        }
+        
+        #status-message {
+            width: 100%;
+            text-align: center;
+            margin-top: 1vmin;
+            font-size: 3vmin;
+            font-weight: bold;
+            color: #333;
+            padding: 5px;
+            background-color: rgba(255, 255, 255, 0.7); /* स्टेटस मैसेज के लिए हल्का बैकग्राउंड */
+        }
+    </style>
 </head>
 <body>
-<div id="board"></div>
-<script>
-  const TOKEN_IMAGES = {
-    rook: 'rook.png',
-    bishop: 'bishop.png',
-    knight: 'knight.png',
-    king: 'king.png',
-    star: 'star.png',
-    block: 'block.jpg'
-  };
-  const GITHUB_RAW_JSON_URL = 'https://raw.githubusercontent.com/GOLu496/Files/main/puzzle.json';
 
-  const rows = ['A', 'B', 'C', 'D'];
-  const cols = ['1', '2', '3', '4'];
-  let boardState = {};
-  let fixedTokens = new Set();
-  let selectedToken = null;
-  let selectedPos = null;
+    <div id="game-container">
+        <div id="board">
+            </div>
+        <div id="status-message">Loading game...</div>
+    </div>
 
-  function createBoard() {
-    const board = document.getElementById('board');
-    board.innerHTML = '';
-    for (let r of rows) {
-      for (let c of cols) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        cell.dataset.pos = r + c;
-        board.appendChild(cell);
-      }
-    }
-  }
+    <script>
+        /* JavaScript (अपडेटेड लॉजिक) */
+        
+        // !!! यहाँ अपनी GitHub रॉ JSON लिंक डालें !!!
+        const JSON_URL = "https://raw.githubusercontent.com/GOLu496/Files/main/puzzle.json";
 
-  async function loadBoardData() {
-    try {
-      const res = await fetch(GITHUB_RAW_JSON_URL);
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data = await res.json();
-      setBoardState(data);
-    } catch(e) {
-      console.error('Load error:', e);
-    }
-  }
+        const IMAGE_FILES = {
+            'Rook': 'Rook.png',
+            'Knight': 'Knight.png',
+            'Bishop': 'Bishop.png',
+            'King': 'King.png',
+            'Star': 'Star.png', 
+            'Block': 'Block.jpg',
+            'Empty': 'empty.png' // नया: खाली सेल के लिए
+        };
 
-  function setBoardState(data) {
-    boardState = {};
-    fixedTokens.clear();
-    document.querySelectorAll('.token').forEach(t => t.remove());
-    for (let pos in data) {
-      let token = data[pos];
-      boardState[pos] = token;
-      if(token === 'star' || token === 'block') fixedTokens.add(pos);
-    }
-    renderTokens();
-  }
+        const BOARD_SIZE = 4;
+        const boardElement = document.getElementById('board');
+        const statusElement = document.getElementById('status-message');
 
-  function renderTokens() {
-    // Clear all tokens and remove cell highlights
-    document.querySelectorAll('.token').forEach(t => t.remove());
-    document.querySelectorAll('.cell').forEach(cell => {
-      cell.classList.remove('selected', 'possible-move');
-      cell.onclick = null;
-    });
+        let boardState = []; 
+        let selectedSquare = null; 
+        let isGameOver = false; // गेम की स्थिति ट्रैक करने के लिए
 
-    for(let pos in boardState) {
-      let token = boardState[pos];
-      const cell = document.querySelector(`.cell[data-pos="${pos}"]`);
-      let img = document.createElement('img');
-      img.src = TOKEN_IMAGES[token] || 'unknown.png';
-      img.className = 'token';
-      if(fixedTokens.has(pos)) img.classList.add('fixed');
-      img.dataset.pos = pos;
-      img.dataset.token = token;
-      cell.appendChild(img);
+        // --- 1. JSON डेटा एक्सट्रैक्ट करें और गेम को इनिशियलाइज़ करें ---
+        async function loadGame() {
+            try {
+                // ... (JSON fetching code is the same)
+                statusElement.textContent = "Fetching game data...";
+                const response = await fetch(JSON_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const initialConfig = await response.json();
+                
+                boardState = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(null));
 
-      if(!fixedTokens.has(pos)) {
-        img.addEventListener('click', () => selectToken(img));
-      }
-    }
-  }
+                initialConfig.pieces.forEach(p => {
+                    // सुनिश्चित करें कि टोकन हमारे पास है और स्थिति मान्य है
+                    if (p.row >= 0 && p.row < BOARD_SIZE && p.col >= 0 && p.col < BOARD_SIZE && IMAGE_FILES[p.piece]) {
+                        boardState[p.row][p.col] = p.piece;
+                    }
+                });
 
-  function selectToken(tokenElem) {
-    clearHighlights();
-    // Deselect previous if any
-    if(selectedToken) {
-      const prevCell = document.querySelector(`.cell[data-pos="${selectedPos}"]`);
-      if(prevCell) prevCell.classList.remove('selected');
-      selectedToken.style.border = '';
-    }
-    selectedToken = tokenElem;
-    selectedPos = tokenElem.dataset.pos;
+                isGameOver = false;
+                renderBoard();
+                statusElement.textContent = "Game started! Move the King to the Star to win.";
 
-    // Highlight selected token's cell yellow
-    const cell = document.querySelector(`.cell[data-pos="${selectedPos}"]`);
-    if(cell) cell.classList.add('selected');
-
-    // Optional border highlight on token
-    selectedToken.style.border = '2px solid white';
-
-    // Show possible moves with blue background
-    const moves = calculateMoves(selectedPos, selectedToken.dataset.token);
-    moves.forEach(p => {
-      let moveCell = document.querySelector(`.cell[data-pos="${p}"]`);
-      if(moveCell) {
-        moveCell.classList.add('possible-move');
-        moveCell.onclick = () => moveToken(selectedPos, p);
-      }
-    });
-  }
-
-  function clearHighlights() {
-    document.querySelectorAll('.cell').forEach(cell => {
-      cell.classList.remove('selected', 'possible-move');
-      cell.onclick = null;
-    });
-    if(selectedToken) {
-      selectedToken.style.border = '';
-      selectedToken = null;
-      selectedPos = null;
-    }
-  }
-
-  function moveToken(fromPos, toPos) {
-    if(!selectedToken) return;
-    // Block cells cannot be entered
-    if(boardState[toPos] === 'block') return;
-
-    // If king moves to star, player wins
-    if(boardState[fromPos] === 'king' && boardState[toPos] === 'star') {
-      alert('Congratulations! You Win!');
-    }
-
-    // Move token logically
-    boardState[toPos] = boardState[fromPos];
-    delete boardState[fromPos];
-
-    clearHighlights();
-    renderTokens();
-  }
-
-  function calculateMoves(pos, token) {
-    const [r, c] = [rows.indexOf(pos[0]), cols.indexOf(pos[1])];
-    const moves = [];
-
-    function canMoveTo(row, col) {
-      if(row<0 || row>=4 || col<0 || col>=4) return false;
-      const p = rows[row] + cols[col];
-      if(boardState[p] === 'block') return false;
-      return true;
-    }
-
-    if(token === 'king') {
-      for(let dr=-1; dr<=1; dr++) {
-        for(let dc=-1; dc<=1; dc++) {
-          if(dr===0 && dc===0) continue;
-          if(canMoveTo(r+dr,c+dc)) moves.push(rows[r+dr]+cols[c+dc]);
+            } catch (error) {
+                console.error("Failed to load game configuration:", error);
+                statusElement.textContent = `Error loading game. Check your JSON_URL and internet connection.`;
+            }
         }
-      }
-    }
-    else if(token === 'rook') {
-      // Horizontal and vertical
-      for(let i=r+1; i<4; i++) {
-        if(!canMoveTo(i,c)) break;
-        moves.push(rows[i]+cols[c]);
-      }
-      for(let i=r-1; i>=0; i--) {
-        if(!canMoveTo(i,c)) break;
-        moves.push(rows[i]+cols[c]);
-      }
-      for(let j=c+1; j<4; j++) {
-        if(!canMoveTo(r,j)) break;
-        moves.push(rows[r]+cols[j]);
-      }
-      for(let j=c-1; j>=0; j--) {
-        if(!canMoveTo(r,j)) break;
-        moves.push(rows[r]+cols[j]);
-      }
-    }
-    else if(token === 'bishop') {
-      // Diagonals
-      for(let i=1; i<4; i++) {
-        if(canMoveTo(r-i,c-i)) moves.push(rows[r-i]+cols[c-i]); else break;
-      }
-      for(let i=1; i<4; i++) {
-        if(canMoveTo(r-i,c+i)) moves.push(rows[r-i]+cols[c+i]); else break;
-      }
-      for(let i=1; i<4; i++) {
-        if(canMoveTo(r+i,c-i)) moves.push(rows[r+i]+cols[c-i]); else break;
-      }
-      for(let i=1; i<4; i++) {
-        if(canMoveTo(r+i,c+i)) moves.push(rows[r+i]+cols[c+i]); else break;
-      }
-    }
-    else if(token === 'knight') {
-      // Knight moves
-      const knightSteps = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
-      for(const [dr,dc] of knightSteps) {
-        if(canMoveTo(r+dr,c+dc)) moves.push(rows[r+dr]+cols[c+dc]);
-      }
-    }
 
-    return moves;
-  }
+        // --- 2. बोर्ड को HTML पर रेंडर करें (इमेज के साथ) ---
+        function renderBoard() {
+            boardElement.innerHTML = '';
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const square = document.createElement('div');
+                    square.classList.add('square');
+                    square.setAttribute('data-row', r);
+                    square.setAttribute('data-col', c);
+                    square.addEventListener('click', () => handleSquareClick(r, c));
 
-  createBoard();
-  loadBoardData();
-</script>
+                    const pieceType = boardState[r][c];
+                    const imageSource = pieceType ? IMAGE_FILES[pieceType] : IMAGE_FILES['Empty'];
+                    
+                    // इमेज टैग का उपयोग
+                    const pieceImage = document.createElement('img');
+                    pieceImage.classList.add('piece-image');
+                    pieceImage.src = imageSource;
+                    pieceImage.alt = pieceType || 'Empty';
+                    square.appendChild(pieceImage);
+
+                    boardElement.appendChild(square);
+                }
+            }
+            
+            // हाईलाइट्स (पुराने लॉजिक की तरह)
+            if (selectedSquare) {
+                const [sR, sC] = selectedSquare;
+                const selectedElement = boardElement.querySelector(`[data-row="${sR}"][data-col="${sC}"]`);
+                if (selectedElement) selectedElement.classList.add('selected');
+                
+                const selectedPieceType = boardState[sR][sC];
+                for (let r = 0; r < BOARD_SIZE; r++) {
+                    for (let c = 0; c < BOARD_SIZE; c++) {
+                        if (isValidMove(selectedPieceType, sR, sC, r, c)) {
+                            const targetElement = boardElement.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                            if (targetElement) targetElement.classList.add('highlight');
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 3. क्लिक इवेंट हैंडल करें ---
+        function handleSquareClick(row, col) {
+            // जीत के बाद कोई चाल नहीं
+            if (isGameOver) {
+                statusElement.textContent = "Game Over! Refresh to play again.";
+                return;
+            }
+            
+            const pieceType = boardState[row][col];
+            
+            if (selectedSquare) {
+                const [sR, sC] = selectedSquare;
+                const selectedPieceType = boardState[sR][sC];
+                
+                // 3a. चाल (Move) करें
+                if (isValidMove(selectedPieceType, sR, sC, row, col)) {
+                    
+                    // Star पर जाना: जीत की जाँच
+                    if (boardState[row][col] === 'Star') {
+                        // विन कंडीशन: किंग को स्टार पर जाना होगा
+                        if (selectedPieceType === 'King') {
+                            isGameOver = true;
+                            boardState[sR][sC] = null; // King अपनी जगह से हटा
+                            // Star पर King की इमेज दिखाने के लिए, हमें Star को King से बदलना होगा 
+                            // या बोर्ड रेंडरिंग को बदलना होगा।
+                            // सरलता के लिए, हम King को Star सेल पर "रखते" हैं।
+                            boardState[row][col] = 'King_on_Star'; 
+                            
+                            selectedSquare = null;
+                            renderBoard();
+                            statusElement.textContent = "🏆 CONGRATULATIONS! King reached the Star! 🏆";
+                            return; 
+                        } 
+                        // King नहीं है, तो सामान्य चाल की तरह Star पर जाएँ
+                        else {
+                            // King को छोड़कर कोई भी Star पर कब्जा नहीं कर सकता
+                            // लेकिन King जीत जाए तो Star पर King की इमेज दिखेगी।
+                            // अन्य टोकन Star पर जा सकते हैं, और King की तरह वहाँ कब्जा नहीं करते, 
+                            // वे Star को हटाते नहीं हैं (पिछले नियमों के विपरीत)
+                            
+                            // King की जीत के बाद Star को King_on_Star से बदला गया था। इसे संभालें
+                            if(boardState[row][col] === 'King_on_Star') {
+                                // अगर Star पर King है, तो कोई और नहीं जा सकता
+                                return;
+                            }
+                            
+                            // अन्य टोकन Star की जगह (Star.png) पर खड़े हो सकते हैं 
+                            // और Star वापस आ जाता है जब वे हटते हैं।
+                            // इसे अस्थायी स्थिति के रूप में ट्रैक करना होगा।
+                            
+                            // सरल समाधान: Star एक सामान्य खाली सेल की तरह बर्ताव करता है 
+                            // (जब King के अलावा कोई अन्य टोकन उस पर जाता है)
+                            
+                            // King के अलावा कोई टोकन Star पर जाता है, Star को अस्थायी रूप से हटा दें (null)
+                            boardState[sR][sC] = null;
+                            boardState[row][col] = selectedPieceType; // टोकन Star की जगह पर चला गया
+                            
+                            selectedSquare = null;
+                            renderBoard();
+                            statusElement.textContent = `Moved ${selectedPieceType} to the Star location.`;
+                            return;
+                        }
+                    }
+
+                    // सामान्य चाल (Star से हटना या किसी खाली/अन्य टोकन पर जाना)
+                    boardState[row][col] = selectedPieceType;
+                    boardState[sR][sC] = null; // पुरानी जगह खाली
+                    
+                    selectedSquare = null;
+                    renderBoard();
+                    statusElement.textContent = `Moved ${selectedPieceType}. Your turn.`;
+                } 
+                // 3b. डी-सेलेक्ट या नया टोकन सेलेक्ट करें
+                else {
+                    selectedSquare = null;
+                    if (pieceType && isMovable(pieceType)) {
+                        selectPiece(row, col);
+                    } else {
+                        renderBoard(); 
+                    }
+                }
+            } 
+            // 3c. टोकन सेलेक्ट करें 
+            else if (pieceType && isMovable(pieceType)) {
+                selectPiece(row, col);
+            }
+        }
+
+        // --- 4. टोकन सेलेक्ट करें ---
+        function selectPiece(row, col) {
+            selectedSquare = [row, col];
+            renderBoard(); 
+        }
+
+        // --- 5. नियम और मूव लॉजिक ---
+
+        function isMovable(pieceType) {
+            return pieceType !== 'Star' && pieceType !== 'Block' && pieceType !== 'King_on_Star';
+        }
+
+        function isValidMove(pieceType, startR, startC, endR, endC) {
+            if (startR === endR && startC === endC) return false;
+            
+            const targetPiece = boardState[endR][endC];
+            
+            // Rule: Block पर कोई नहीं जा सकता
+            if (targetPiece === 'Block') return false;
+            
+            // Rule: King को छोड़कर कोई भी Star को हटा नहीं सकता (Star पर जाने पर)
+            if (pieceType !== 'King' && targetPiece === 'Star') {
+                 // Star पर जाना तभी मान्य है जब वह खाली हो, या Star हो।
+                 // अगर Star है, तो उस पर जाना मान्य है। 
+            }
+            
+            // Rule: King के अलावा कोई भी Star के अलावा किसी और टोकन पर कब्जा नहीं कर सकता
+            if (targetPiece !== null && targetPiece !== 'Star' && targetPiece !== 'Block') return false;
+            
+            // अगर Star पर King है (जीत के बाद), तो कोई और नहीं जा सकता
+            if (targetPiece === 'King_on_Star') return false;
+
+
+            const dr = Math.abs(endR - startR);
+            const dc = Math.abs(endC - startC);
+
+            switch (pieceType) {
+                case 'King':
+                    return dr <= 1 && dc <= 1;
+
+                case 'Rook':
+                    if (dr === 0 || dc === 0) {
+                        return !isPathBlocked(startR, startC, endR, endC);
+                    }
+                    return false;
+
+                case 'Bishop':
+                    if (dr === dc) {
+                        return !isPathBlocked(startR, startC, endR, endC);
+                    }
+                    return false;
+
+                case 'Knight':
+                    return (dr === 2 && dc === 1) || (dr === 1 && dc === 2);
+                    
+                default:
+                    return false;
+            }
+        }
+
+        // रास्ते में अवरोधक की जाँच (Rook और Bishop के लिए)
+        function isPathBlocked(startR, startC, endR, endC) {
+            const rStep = Math.sign(endR - startR);
+            const cStep = Math.sign(endC - startC);
+            
+            let r = startR + rStep;
+            let c = startC + cStep;
+            
+            while (r !== endR || c !== endC) {
+                const piece = boardState[r][c];
+                // Block या कोई अन्य टोकन रास्ते को ब्लॉक कर सकता है
+                if (piece !== null && piece !== 'Star') {
+                    return true;
+                }
+                r += rStep;
+                c += cStep;
+            }
+            return false;
+        }
+
+        // गेम शुरू करें
+        loadGame();
+    </script>
 </body>
 </html>
