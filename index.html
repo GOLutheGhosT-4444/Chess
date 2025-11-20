@@ -6,7 +6,7 @@
     <title>4x4 Custom Chess Game - Double Layer Fixed Star</title>
     
     <style>
-        /* 1. नॉन-ज़ूमेबल और नॉन-स्क्रॉलेबल के लिए CSS */
+        
         html, body {
             margin: 0;
             padding: 0;
@@ -15,7 +15,7 @@
             width: 100%;
         }
 
-        /* 2. पूरी तरह से पारदर्शी बैकग्राउंड */
+        
         body {
             background-color: transparent !important; 
             display: flex;
@@ -23,7 +23,7 @@
             align-items: center;
         }
 
-        /* 3. 1:1 कंटेनर */
+        
         #game-container {
             width: 100vw; 
             height: 100vw; 
@@ -53,12 +53,12 @@
             cursor: pointer;
             user-select: none;
             box-sizing: border-box;
-            border: 1px solid rgba(0, 0, 0, 0.1); 
+            border: none; 
             position: relative; 
-            overflow: hidden; /* सुनिश्चित करें कि इमेज सेल के बाहर न जाए */
+            overflow: hidden;
         }
 
-        /* इमेज स्टाइल */
+    
         .piece-image {
             width: 100%;
             height: 100%;
@@ -66,22 +66,20 @@
             position: absolute; 
         }
 
-        /* बेस इमेज (Star/Block/Empty) - पीछे रहेगी */
+        
         .base-image {
-            z-index: 1; 
-            /* Base इमेज को थोड़ा छोटा रखें ताकि करंट इमेज के लिए जगह बने */
+            z-index: 1;
             width: 100%; 
             height: 100%;
         }
 
-        /* करंट इमेज (King/Rook/Empty) - आगे रहेगी */
+        
         .current-image {
             z-index: 2; 
             transition: transform 0.1s ease-in-out;
         }
 
-        /* जब कोई मूवेबल टोकन नहीं होता है, तब करंट इमेज को छिपाएँ (Transparent रखें) */
-        /* यह सुनिश्चित करता है कि बेस इमेज (Star) हमेशा दिखे */
+        
         .current-image[alt="Empty_Current"] {
             display: none; 
         }
@@ -95,16 +93,7 @@
             background-color: rgba(165, 214, 167, 0.5) !important; 
         }
         
-        #status-message {
-            width: 100%;
-            text-align: center;
-            margin-top: 1vmin;
-            font-size: 3vmin;
-            font-weight: bold;
-            color: #333;
-            padding: 5px;
-            background-color: rgba(255, 255, 255, 0.7);
-        }
+        
     </style>
 </head>
 <body>
@@ -112,13 +101,11 @@
     <div id="game-container">
         <div id="board">
             </div>
-        <div id="status-message">Loading game...</div>
+        
     </div>
 
     <script>
-        /* JavaScript (फिक्स्ड Star/Empty लॉजिक) */
         
-        // !!! यहाँ अपनी GitHub रॉ JSON लिंक डालें !!!
         const JSON_URL = "https://raw.githubusercontent.com/GOLu496/Files/main/puzzle.json";
 
         const IMAGE_FILES = {
@@ -136,24 +123,24 @@
 
         const BOARD_SIZE = 4;
         const boardElement = document.getElementById('board');
-        const statusElement = document.getElementById('status-message');
+        
 
-        // boardState अब एक ऑब्जेक्ट स्टोर करेगा: {base: 'Star' / 'Empty_Base', current: 'King' / null}
+        
         let boardState = []; 
         let selectedSquare = null; 
         let isGameOver = false;
 
-        // --- 1. JSON डेटा एक्सट्रैक्ट करें और गेम को इनिशियलाइज़ करें ---
+
         async function loadGame() {
             try {
-                statusElement.textContent = "Fetching game data...";
+                
                 const response = await fetch(JSON_URL);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const initialConfig = await response.json();
                 
-                // बोर्ड को इनिशियलाइज़ करें: {base: 'Empty_Base', current: null}
+                
                 boardState = Array(BOARD_SIZE).fill(0).map(() => 
                     Array(BOARD_SIZE).fill(0).map(() => ({ base: 'Empty_Base', current: null }))
                 );
@@ -163,10 +150,10 @@
                         const cell = boardState[p.row][p.col];
                         
                         if (FIXED_TOKENS.includes(p.piece)) {
-                            // Star या Block को base लेयर में सेट करें
+                            
                             cell.base = p.piece;
                         } else {
-                            // Movable टोकन को current लेयर में सेट करें
+                            
                             cell.current = p.piece;
                         }
                     }
@@ -174,15 +161,15 @@
 
                 isGameOver = false;
                 renderBoard();
-                statusElement.textContent = "Game started! Move the King to the Star to win.";
+                
 
             } catch (error) {
                 console.error("Failed to load game configuration:", error);
-                statusElement.textContent = `Error loading game. Check your JSON_URL and internet connection.`;
+                
             }
         }
 
-        // --- 2. बोर्ड को HTML पर रेंडर करें (फिक्स्ड Star के साथ) ---
+    
         function renderBoard() {
             boardElement.innerHTML = '';
             for (let r = 0; r < BOARD_SIZE; r++) {
@@ -195,14 +182,14 @@
                     square.setAttribute('data-col', c);
                     square.addEventListener('click', () => handleSquareClick(r, c));
 
-                    // बेस इमेज (Star, Block, या Empty_Base) - यह हमेशा दिखेगी
+                    
                     const baseImage = document.createElement('img');
                     baseImage.classList.add('piece-image', 'base-image');
                     baseImage.src = IMAGE_FILES[cellData.base];
                     baseImage.alt = cellData.base;
                     square.appendChild(baseImage);
 
-                    // करंट इमेज (Movable Piece, या Empty_Current)
+                    
                     const currentPiece = cellData.current || 'Empty_Current';
                     const currentImage = document.createElement('img');
                     currentImage.classList.add('piece-image', 'current-image');
@@ -214,7 +201,7 @@
                 }
             }
             
-            // हाईलाइट्स (पुराने लॉजिक की तरह)
+
             if (selectedSquare) {
                 const [sR, sC] = selectedSquare;
                 const selectedElement = boardElement.querySelector(`[data-row="${sR}"][data-col="${sC}"]`);
@@ -232,10 +219,10 @@
             }
         }
 
-        // --- 3. क्लिक इवेंट हैंडल करें ---
+        
         function handleSquareClick(row, col) {
             if (isGameOver) {
-                statusElement.textContent = "Game Over! Refresh to play again.";
+                
                 return;
             }
             
@@ -248,7 +235,7 @@
                 
                 if (isValidMove(selectedPieceType, sR, sC, row, col)) {
                     
-                    // 3a. विन कंडीशन चेक करें
+                    
                     if (cellData.base === 'Star' && selectedPieceType === 'King') {
                         isGameOver = true;
                         
@@ -257,23 +244,23 @@
                         
                         selectedSquare = null;
                         renderBoard();
-                        statusElement.textContent = "🏆 CONGRATULATIONS! King reached the Star! 🏆";
+                        
                         return; 
                     }
 
-                    // 3b. सामान्य चाल
+                
                     
-                    // नया सेल: ऊपर का टोकन ले जाएँ
+                
                     boardState[row][col].current = selectedPieceType;
                     
-                    // पुराना सेल: ऊपर का टोकन हटाएँ
+                
                     boardState[sR][sC].current = null; 
                     
                     selectedSquare = null;
                     renderBoard();
-                    statusElement.textContent = `Moved ${selectedPieceType}. Your turn.`;
+                    
                 } 
-                // 3c. डी-सेलेक्ट या नया टोकन सेलेक्ट करें
+                
                 else {
                     selectedSquare = null;
                     if (pieceType && isMovable(pieceType)) {
@@ -283,22 +270,21 @@
                     }
                 }
             } 
-            // 3d. टोकन सेलेक्ट करें 
+             
             else if (pieceType && isMovable(pieceType)) {
                 selectPiece(row, col);
             }
         }
 
-        // --- 4. टोकन सेलेक्ट करें ---
+        
         function selectPiece(row, col) {
             selectedSquare = [row, col];
             renderBoard(); 
         }
 
-        // --- 5. नियम और मूव लॉजिक (वही रहा) ---
-
+        
         function isMovable(pieceType) {
-            // केवल मूवेबल टोकन को ही सेलेक्ट करने की अनुमति दें
+        
             return pieceType !== null && !FIXED_TOKENS.includes(pieceType);
         }
 
@@ -307,10 +293,10 @@
             
             const targetCell = boardState[endR][endC];
             
-            // Rule: Block (base layer) पर कोई नहीं जा सकता
+        
             if (targetCell.base === 'Block') return false;
             
-            // Rule: किसी भी मूवेबल टोकन (current layer) पर कब्जा नहीं कर सकता (क्योंकि सभी एक रंग के हैं)
+        
             if (targetCell.current !== null) return false;
 
 
@@ -341,8 +327,7 @@
             }
         }
 
-        // रास्ते में अवरोधक की जाँच (Rook और Bishop के लिए)
-        function isPathBlocked(startR, startC, endR, endC) {
+                function isPathBlocked(startR, startC, endR, endC) {
             const rStep = Math.sign(endR - startR);
             const cStep = Math.sign(endC - startC);
             
@@ -352,10 +337,10 @@
             while (r !== endR || c !== endC) {
                 const cell = boardState[r][c];
                 
-                // अगर रास्ते में Block है, तो रास्ता बंद
-                if (cell.base === 'Block') return true;
                 
-                // अगर रास्ते में कोई मूवेबल टोकन है, तो रास्ता बंद
+            if (cell.base === 'Block') return true;
+                
+            
                 if (cell.current !== null) return true;
                 
                 r += rStep;
@@ -364,7 +349,6 @@
             return false;
         }
 
-        // गेम शुरू करें
         loadGame();
     </script>
 </body>
