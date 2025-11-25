@@ -429,60 +429,7 @@ function sendToKodular(message) {
     }
 }
 
-        function isInKodularWebViewer() {
-    const ua = navigator.userAgent || "";
-    if (ua.includes("AndroidWebView") || ua.includes("Kodular")) return true;
-    if (window.KodularWebViewerGoBack) return true;
-    return false;
-}
-
-if (!isInKodularWebViewer()) {
-    document.body.innerHTML = `
-      <div id="loading-screen" style="height:100vh; display:flex; justify-content:center; align-items:center; flex-direction:column; font-size:1.8rem; color:#444;">
-        Please wait... Loading game<span id="dots">.</span>
-        <div style="margin: 20px 0; width: 80%; height: 20px; border: 2px solid #3498db; border-radius: 10px; overflow: hidden;">
-          <div id="progress-bar" style="width: 0%; height: 100%; background-color: #3498db; border-radius: 10px;"></div>
-        </div>
-        <div id="progress-text">0%</div>
-      </div>
-    `;
-
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes spin {
-        0% { transform: rotate(0deg);}
-        100% { transform: rotate(360deg);}
-      }
-    `;
-    document.head.appendChild(style);
-
-    let dotCount = 1;
-    setInterval(() => {
-        const dots = document.getElementById('dots');
-        if (dots) {
-            dotCount = (dotCount % 3) + 1;
-            dots.textContent = '.'.repeat(dotCount);
-        }
-    }, 500);
-
-    let progress = 0;
-    const interval = setInterval(() => {
-        const progressBar = document.getElementById('progress-bar');
-        const progressText = document.getElementById('progress-text');
-        if (progressBar && progressText) {
-            if (progress >= 100) {
-                clearInterval(interval);
-            } else {
-                progress++;
-                progressBar.style.width = progress + '%';
-                progressText.textContent = progress + '%';
-            }
-        }
-    }, 100);
-
-} else {
-    loadGame();
-}
+        loadGame();
     </script>
 </body>
 </html>
