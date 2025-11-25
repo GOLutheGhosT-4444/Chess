@@ -353,6 +353,81 @@
             }
             return false;
         }
+    
+    function handleSquareClick(row, col) {
+    if (isGameOver) {
+        return;
+    }
+    
+    const cellData = boardState[row][col];
+    const pieceType = cellData.current;
+    
+    if (selectedSquare) {
+        const [sR, sC] = selectedSquare;
+        const selectedPieceType = boardState[sR][sC].current;
+        
+        if (isValidMove(selectedPieceType, sR, sC, row, col)) {
+            
+            if (cellData.base === 'Star' && selectedPieceType === 'King') {
+                isGameOver = true;
+
+               
+                sendToKodular("win");
+                
+                
+                boardState[row][col].current = selectedPieceType; 
+                boardState[sR][sC].current = null; 
+                
+                selectedSquare = null;
+                renderBoard();
+
+                
+                document.getElementById('board').style.display = 'none';
+                const winMessage = document.createElement('div');
+                winMessage.style.fontSize = '3em';
+                winMessage.style.color = 'Black';
+                winMessage.style.textAlign = 'center';
+                winMessage.style.marginTop = '20px';
+                winMessage.textContent = 'You won!';
+                document.getElementById('game-container').appendChild(winMessage);
+                
+                return; 
+            }
+
+           
+            boardState[row][col].current = selectedPieceType;
+            boardState[sR][sC].current = null;
+            
+            
+            sendToKodular("-1");
+            
+            selectedSquare = null;
+            renderBoard();
+            
+        } else {
+            selectedSquare = null;
+            if (pieceType && isMovable(pieceType)) {
+                selectPiece(row, col);
+            } else {
+                renderBoard(); 
+            }
+        }
+    } else if (pieceType && isMovable(pieceType)) {
+        selectPiece(row, col);
+    }
+}
+
+function sendToKodular(message) {
+      
+    if(window.KodularWebViewerGoBack) {
+        window.KodularWebViewerGoBack(message);
+    } else if(window.postMessage) {
+        
+        window.postMessage(message, "*");
+    } else {
+        console.log("Message to Kodular: " + message);
+    }
+}
 
         loadGame();
     </script>
